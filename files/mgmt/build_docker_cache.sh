@@ -1,6 +1,7 @@
 #!/bin/bash -x
 
 CONF_DIR=${CONF_DIR:-"/var/www/mgmt-conf"}
+NFS_DIR=${NFS_DIR:-"/srv/share"}
 
 # Check Prerequisit.
 [ ! -f /usr/bin/docker ] && wget -qO- https://get.docker.com/ | sh
@@ -48,3 +49,10 @@ docker run --name flannel-compile \
   -v /var/flannel/flannel:/opt/flannel -i -t google/golang /bin/bash -c "cd /opt/flannel && ./build"
 cp -f /var/flannel/flannel/bin/flanneld ${CONF_DIR}
 docker rm flannel-compile
+
+# Build NFS Server
+mkdir -p ${NFS_DIR}
+docker pull cpuguy83/nfs-server
+docker create --restart always --name nfs-server --privileged cpuguy83/nfs-server ${NFS_DIR}
+docker start nfs-server
+NFS_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' nfs-server)
