@@ -27,3 +27,4 @@ Listen 5001
 </VirtualHost>
 
 EOF
+a2ensite 5001-mirror
