@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 CONF_DIR=${CONF_DIR:-"/var/www/mgmt-conf"}
 
@@ -36,6 +36,8 @@ service apache2 reload
 echo "DOCKER_OPTS=\"--insecure-registry 127.0.0.1 --registry-mirror http://127.0.0.1:5050 \"" >> /etc/default/docker
 service docker restart
 
+while [ -z "$(ifconfig docker0 | grep inet | wc -l)" ] ; do sleep 0.1; done ;
+sleep 0.5
 
 # Flannel Build - Newest Version
 mkdir -p /var/flannel
@@ -46,4 +48,3 @@ docker run --name flannel-compile \
   -v /var/flannel/flannel:/opt/flannel -i -t google/golang /bin/bash -c "cd /opt/flannel && ./build"
 cp -f /var/flannel/flannel/bin/flanneld ${CONF_DIR}
 docker rm flannel-compile
-
