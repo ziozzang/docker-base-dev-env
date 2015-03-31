@@ -2,10 +2,14 @@
 
 CONF_DIR=${CONF_DIR:-"/var/www/mgmt-conf"}
 
-wget -qO- https://get.docker.com/ | sh
+# Check Prerequisit.
+[ ! -f /usr/bin/docker ] && wget -qO- https://get.docker.com/ | sh
+apt-get update && apt-get install -fy apache2 git-core
 
+# Registry Setup.
 docker pull registry
 
+# Run Registry & Cache
 C=$(docker create --restart always  --name registry-store -p 5000:5000 -v /srv/registry-store/data:/tmp registry)
 docker start $C
 
@@ -14,17 +18,32 @@ C=$(docker create --restart always --name registry-cache -p 5050:5000 -v /srv/re
   -e MIRROR_TAGS_CACHE_TTL=1800 registry)
 docker start $C
 
-apt-get install -fy apache2
-
-mkdir -f ${CONF_DIR}
-
+# Build Configure Share Web Server.
+mkdir -p ${CONF_DIR}
 cat > /etc/apache2/sites-available/5001-mirror.conf << EOF
 Listen 5001
 <VirtualHost *:5001>
         DocumentRoot ${CONF_DIR}
-        ErrorLog ${APACHE_LOG_DIR}/conf-error.log
-        CustomLog ${APACHE_LOG_DIR}/conf-access.log combined
+        ErrorLog \${APACHE_LOG_DIR}/conf-error.log
+        CustomLog \${APACHE_LOG_DIR}/conf-access.log combined
 </VirtualHost>
 
 EOF
 a2ensite 5001-mirror
+service apache2 reload
+
+# Reconfigure Docker itself
+echo "DOCKER_OPTS=\"--insecure-registry 127.0.0.1 --registry-mirror http://127.0.0.1:5050 \"" >> /etc/default/docker
+service docker restart
+
+
+# Flannel Build - Newest Version
+mkdir -p /var/flannel
+cd /var/flannel
+git clone https://github.com/coreos/flannel.git
+
+docker run --name flannel-compile \
+  -v /var/flannel/flannel:/opt/flannel -i -t google/golang /bin/bash -c "cd /opt/flannel && ./build"
+cp -f /var/flannel/flannel/bin/flanneld ${CONF_DIR}
+docker rm flannel-compile
+
